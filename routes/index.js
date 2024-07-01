@@ -1,32 +1,37 @@
-#!/usr/bin/node
-// Inside the folder routes, create a file index.js that contains all endpoints of our API:
-// GET /status => AppController.getStatus
-// GET /stats => AppController.getStats
-const express = require('express');
+// eslint-disable-next-line no-unused-vars
+import { Express } from 'express';
+import AppController from '../controllers/AppController';
+import AuthController from '../controllers/AuthController';
+import UsersController from '../controllers/UsersController';
+import FilesController from '../controllers/FilesController';
+import { basicAuthenticate, xTokenAuthenticate } from '../middlewares/auth';
+import { APIError, errorResponse } from '../middlewares/error';
 
-const router = express.Router();
-const AppController = require('../controllers/AppController');
-const UsersController = require('../controllers/UsersController');
-const AuthController = require('../controllers/AuthController');
-const FilesController = require('../controllers/FilesController');
-//const UserController = require('../controllers/UserController');
+/**
+ * Injects routes with their handlers to the given Express application.
+ * @param {Express} api
+ */
+const injectRoutes = (api) => {
+  api.get('/status', AppController.getStatus);
+  api.get('/stats', AppController.getStats);
 
-// definning the routes 
-//router.get('/status', AppController.getStatus);
-//router.get('/stats', AppController.getStats);
-//router.post('/users', UsersController.postNew);
-//router.get('/connect', AuthController.getConnect);
-//router.get('/disconnect', AuthController.getDisconnect);
-//router.get('/users/me', UsersController.getMe);
-router.get('/status', AppController.getStatus ? AppController.getStatus : (req, res) => {});
-router.get('/stats', AppController.getStats ? AppController.getStats : (req, res) => {});
-router.post('/users', UsersController.postNew ? UsersController.postNew : (req, res) => {});
-router.get('/connect', AuthController.getConnect ? AuthController.getConnect : (req, res) => {});
-router.get('/disconnect', AuthController.getDisconnect ? AuthController.getDisconnect : (req, res) => {});
-router.get('/users/me', UsersController.getMe ? UsersController.getMe : (req, res) => {});
-router.post('/files', FilesController.postUpload ? FilesController.postUpload: (req, res) => {});
+  api.get('/connect', basicAuthenticate, AuthController.getConnect);
+  api.get('/disconnect', xTokenAuthenticate, AuthController.getDisconnect);
 
-// This code checks if each controller method is defined before calling it.
-// If it's not defined, it uses a default callback function that does nothing.
+  api.post('/users', UsersController.postNew);
+  api.get('/users/me', xTokenAuthenticate, UsersController.getMe);
 
-module.exports = router;
+  api.post('/files', xTokenAuthenticate, FilesController.postUpload);
+  api.get('/files/:id', xTokenAuthenticate, FilesController.getShow);
+  api.get('/files', xTokenAuthenticate, FilesController.getIndex);
+  api.put('/files/:id/publish', xTokenAuthenticate, FilesController.putPublish);
+  api.put('/files/:id/unpublish', xTokenAuthenticate, FilesController.putUnpublish);
+  api.get('/files/:id/data', FilesController.getFile);
+
+  api.all('*', (req, res, next) => {
+    errorResponse(new APIError(404, `Cannot ${req.method} ${req.url}`), req, res, next);
+  });
+  api.use(errorResponse);
+};
+
+export default injectRoutes;
